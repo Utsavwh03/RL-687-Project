@@ -38,18 +38,15 @@ We formulate this as a Markov Decision Process (MDP):
 
 - **States**:  
   At time \( t \), the state is
-  \[
-  s_t = (\mathbf{c}_t, \mathbf{p}_t)
-  \]
+  
+  $$ s_t = (\mathbf{c}_t, \mathbf{p}_t) $$
+  
   where:
-  - \( \mathbf{c}_t \in \{0,1\}^N \) is a binary vector encoding which pages are in the cache:
-    \[
-    c_t[i] = 1 \iff \text{page } i \text{ is in the cache at time } t.
-    \]
-  - \( \mathbf{p}_t \in \{0,1\}^N \) is a one-hot vector for the current request:
-    \[
-    p_t[i] = 1 \iff \text{page } i \text{ is requested at time } t.
-    \]
+  - $$ \mathbf{c}_t \in \{0,1\}^N $$ is a binary vector encoding which pages are in the cache:
+
+    $$c_t[i] = 1 \iff \text{page } i \text{ is in the cache at time } t. $$
+  - $$ \mathbf{p}_t \in \{0,1\}^N $$ is a one-hot vector for the current request:
+    $$ p_t[i] = 1 \iff \text{page } i \text{ is requested at time } t. $$
 
   In code, we represent the state as a concatenated vector of length `2 * num_pages`.
 
