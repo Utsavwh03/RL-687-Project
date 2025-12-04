@@ -111,8 +111,21 @@ def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
     
     return states, actions, rewards, episode_stats
 
+def compute_returns(rewards, gamma=0.99): # G_t for each time step t
+    returns = []
+    G = 0
+    for reward in reversed(rewards):
+        G = reward + gamma * G
+        returns.append(G)
+    returns.reverse()
+    return returns
+
+def reinforce_update(policy_net,value_net,optimiser_policy,optimiser_value,states,actions,rewards,gamma=0.99,device="cuda"):
+
+
+    pass
 # test the sample_episode function
-if __name__ == "__main__":
+def test_sample_episode():
     print("="*60)
     print("REINFORCE ALGORITHM TEST")
     print("="*60)
