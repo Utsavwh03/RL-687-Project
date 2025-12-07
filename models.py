@@ -3,6 +3,9 @@
 import torch 
 import torch.nn as nn 
 
+# ---------------------------------------------------------
+# POLICY NETWORK (π(a|s; θ))
+# ---------------------------------------------------------
 class PolicyNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim=128):
         super(PolicyNetwork, self).__init__()
