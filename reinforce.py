@@ -3,11 +3,11 @@
 import torch 
 import numpy as np
 from torch.distributions import Categorical
-from models import PolicyNetwork
+from models import PolicyNetwork, ValueNetwork
 from env_cache import CacheEnv
 
 
-def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
+def sample_episode(env: CacheEnv, policy_net: PolicyNetwork, device: torch.device, gamma: float = 0.99, verbose: bool = False) -> tuple:
     """
     Sample an episode using the current policy.
     
@@ -77,6 +77,7 @@ def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
     total_reward = sum(rewards)
     avg_reward = np.mean(rewards) if rewards else 0.0
     
+    #TODO: reformat printing statements 
     if verbose:
         print("\n" + "="*60)
         print("EPISODE SUMMARY")
@@ -111,7 +112,7 @@ def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
     
     return states, actions, rewards, episode_stats
 
-def compute_returns(rewards, gamma=0.99): # G_t for each time step t
+def compute_returns(rewards: list, gamma: float = 0.99) -> list:
     returns = []
     G = 0
     for reward in reversed(rewards):
@@ -120,10 +121,79 @@ def compute_returns(rewards, gamma=0.99): # G_t for each time step t
     returns.reverse()
     return returns
 
-def reinforce_update(policy_net,value_net,optimiser_policy,optimiser_value,states,actions,rewards,gamma=0.99,device="cuda"):
+def reinforce_update(policy_net: PolicyNetwork, value_net: ValueNetwork, optimiser_policy: torch.optim.Optimizer, 
+                     optimiser_value: torch.optim.Optimizer, states: list, actions: list, rewards: list, gamma: float = 0.99, 
+                     device: torch.device = torch.device('cpu')) -> tuple:
 
+    returns = torch.tensor(compute_returns(rewards, gamma),
+                           dtype=torch.float32, device=device)
+    states_tensor = torch.stack(states).to(device)
+    actions_tensor = torch.tensor([a.item() for a in actions],
+                                  dtype=torch.long, device=device)
 
-    pass
+    values = value_net(states_tensor)
+    critic_loss = ((returns - values) ** 2).mean()
+
+    logits = policy_net(states_tensor)
+    log_probs = torch.log_softmax(logits, dim=-1)
+    chosen_log_probs = log_probs[torch.arange(len(actions)), actions_tensor]
+
+    advantages = (returns - values).detach()
+    actor_loss = -(chosen_log_probs * advantages).mean()
+
+    optimiser_policy.zero_grad()
+    actor_loss.backward()
+    optimiser_policy.step()
+
+    optimiser_value.zero_grad()
+    critic_loss.backward()
+    optimiser_value.step()
+
+    return actor_loss.item(), critic_loss.item()
+
+def train_reinforce(env: CacheEnv, policy_net: PolicyNetwork, value_net: ValueNetwork, optimiser_policy: torch.optim.Optimizer, 
+                    optimiser_value: torch.optim.Optimizer, device: torch.device = torch.device('cpu'), num_episodes: int = 1000, 
+                    gamma: float = 0.99, verbose: bool = False, freq_print: int = 10):
+    
+    episode_rewards = []
+    episode_hit_rates = []
+    for episode in range(num_episodes):
+        states, actions, rewards, stats = sample_episode(env, policy_net, device, gamma, verbose=False)
+        actor_loss, critic_loss = reinforce_update(policy_net, value_net, optimiser_policy, optimiser_value, states, actions, rewards, gamma, device)
+        
+        episode_rewards.append(stats['total_reward'])
+        episode_hit_rates.append(stats['hit_rate'])
+        
+        if verbose and (episode + 1) % freq_print == 0:
+            print(f"Episode {episode+1}/{num_episodes} - Total Reward: {stats['total_reward']}, Hit Rate: {stats['hit_rate']*100:.2f}%, Actor Loss: {actor_loss:.4f}, Critic Loss: {critic_loss:.4f}")
+        
+    return episode_rewards, episode_hit_rates
+    
+
+def smoke_test():
+    device = "cuda"
+
+    env = CacheEnv(num_pages=10, cache_size=3, episode_len=10)
+    policy_net = PolicyNetwork(state_dim=20, action_dim=10).to(device)
+    value_net = ValueNetwork(state_dim=20).to(device)
+
+    optimiser_policy = torch.optim.Adam(policy_net.parameters(), lr=1e-4)
+    optimiser_value = torch.optim.Adam(value_net.parameters(), lr=1e-4)
+
+    state = env.reset()
+    s_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+
+    logits = policy_net(s_tensor)
+    vaalue = value_net(s_tensor)
+
+    states, actions, rewards, stats = sample_episode(env, policy_net, device, verbose=True)
+
+    rewards_hist, hitrates_hist = train_reinforce(env, policy_net, value_net, optimiser_policy, optimiser_value, device, num_episodes=100000, verbose=True, freq_print=100)
+    avg_hit = sum(hitrates_hist[-100:]) / 100
+    avg_miss = 1 - avg_hit
+    print(f"Average Hit Rate:  {avg_hit:.4f}")
+    print(f"Average Miss Rate: {avg_miss:.4f}")
+
 # test the sample_episode function
 def test_sample_episode():
     print("="*60)
@@ -145,7 +215,7 @@ def test_sample_episode():
     print(f"  - Number of episodes: 100")
     
     # Run 100 episodes and collect statistics
-    num_episodes = 1
+    num_episodes = 100
     all_stats = []
     
     print(f"\n{'='*60}")
@@ -201,3 +271,10 @@ def test_sample_episode():
     print(f"  Hits: {worst_episode['num_hits']}, Misses: {worst_episode['num_misses']}")
     
     print(f"\n{'='*60}")
+
+if __name__ == "__main__":
+    test_sample_episode()
+
+    print("="*60)
+
+    smoke_test()
