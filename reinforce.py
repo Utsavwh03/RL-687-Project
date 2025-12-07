@@ -3,7 +3,7 @@
 import torch 
 import numpy as np
 from torch.distributions import Categorical
-from models import PolicyNetwork
+from models import PolicyNetwork, ValueNetwork
 from env_cache import CacheEnv
 import torch.nn.functional as F
 
@@ -50,22 +50,25 @@ def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
         next_state, reward, done, info = env.step(action.item())
         
         states.append(s_tensor)
-        actions.append(action)
+        actions.append(action) # action is a tensor of shape (1,)
         rewards.append(reward)
         requests.append(current_req)
         hits.append(info["hit"])
-        cache_states.append(sorted(env.cache.copy()))
+        cache_states.append(env.cache.copy())  # Preserve order - slots matter now
         
         if verbose:
             hit_str = "HIT ✓" if info["hit"] else "MISS ✗"
             action_prob = action_dist.probs[action.item()].item()
+            action_val = action.item()
             print(f"\nStep {step}:")
-            print(f"  Cache (before): {sorted(cache_before) if cache_before else '[]'}")
+            print(f"  Cache (before): {cache_before if cache_before else '[]'}")
             print(f"  Request:        Page {current_req}")
-            print(f"  Action:         Evict page {action.item()}")
+            print(f"  Action:         Evict cache slot {action_val}")
+            if cache_before and action_val < len(cache_before):
+                print(f"  Slot {action_val} contains: Page {cache_before[action_val]}")
             print(f"  Result:         {hit_str}")
             print(f"  Reward:         {reward:+d}")
-            print(f"  Cache (after):  {sorted(env.cache) if env.cache else '[]'}")
+            print(f"  Cache (after):  {env.cache if env.cache else '[]'}")
             print(f"  Action prob:    {action_prob:.4f}")
         
         state = next_state
@@ -91,13 +94,14 @@ def sample_episode(env, policy_net, device, gamma=0.99, verbose=False):
         print(f"  Average reward: {avg_reward:.2f}")
         
         print(f"\n📋 Step-by-step breakdown:")
-        print(f"{'Step':<6} {'Request':<8} {'Action':<8} {'Hit?':<6} {'Reward':<8} {'Cache After'}")
-        print("-" * 70)
+        print(f"{'Step':<6} {'Request':<8} {'Action':<12} {'Hit?':<6} {'Reward':<8} {'Cache After'}")
+        print("-" * 75)
         for i in range(len(rewards)):
             cache_after = cache_states[i] if i < len(cache_states) else []
             hit_str = "✓" if hits[i] else "✗"
             cache_str = str(cache_after) if cache_after else "[]"
-            print(f"{i+1:<6} {requests[i]:<8} {actions[i].item():<8} {hit_str:<6} {rewards[i]:+8} {cache_str}")
+            action_str = f"Slot {actions[i].item()}"
+            print(f"{i+1:<6} {requests[i]:<8} {action_str:<12} {hit_str:<6} {rewards[i]:+8} {cache_str}")
         
         print("\n" + "="*60)
     
@@ -121,31 +125,55 @@ def compute_returns(rewards, gamma=0.99): # G_t for each time step t
     returns.reverse()
     return returns
 
-def reinforce_update(policy_net,value_net,optimiser_policy,optimiser_value,states,actions,rewards,gamma=0.99,device="cuda"):
-        states_tensor = torch.tensor(states, dtype=torch.float32, device=device)
-        actions_tensor = torch.tensor(actions, dtype=torch.long, device=device)
-        returns = compute_returns(rewards, gamma)
-        returns_tensor = torch.tensor(returns, dtype=torch.float32, device=device)
-        # Compute the Baseline v_w(S_t)
-        values = value_net(states_tensor)
-        advantages = returns_tensor - values.detach()  # advantage A_t = G_t - v_w(S_t) for all steps 
-        
-        # Policy Loss
-        action_logits = policy_net(states_tensor) # no_of_steps x no_of_actions x 1
-        log_probs = torch.log_softmax(action_logits, dim=-1)
-        chosen_log_probs = log_probs(torch.arange(action_logits.shape[1], device=device), actions_tensor)
-        policy_loss = -torch.mean(chosen_log_probs * advantages)
-        optimiser_policy.zero_grad()
-        policy_loss.backward()
-        optimiser_policy.step()
-        
-        # Value Loss
-        value_loss = (advantages*(returns_tensor-values)**2).mean()
-        optimiser_value.zero_grad()
-        value_loss.backward()
-        optimiser_value.step()
+def reinforce_update(policy_net, value_net, optimiser_policy, optimiser_value, states, actions, rewards, gamma=0.99, device="cpu"):
+    """
+    Perform one REINFORCE update for a single episode.
+    
+    Args:
+        policy_net: Policy network
+        value_net: Value network (baseline)
+        optimiser_policy: Optimizer for policy network
+        optimiser_value: Optimizer for value network
+        states: List of state tensors
+        actions: List of action tensors
+        rewards: List of rewards
+        gamma: Discount factor
+        device: torch device
+    
+    Returns:
+        policy_loss, value_loss
+    """
+    # Convert lists of tensors  to tensor
+    states_tensor = torch.stack(states)  # Shape: [T, state_dim]
+    actions_tensor = torch.stack(actions).squeeze()  # Shape: [T]
+    returns = compute_returns(rewards, gamma)
+    returns_tensor = torch.tensor(returns, dtype=torch.float32, device=device)
+    
+    # Compute the Baseline v_w(S_t)
+    values = value_net(states_tensor).squeeze()  # Shape: [T]
+    advantages = returns_tensor - values.detach()  # advantage A_t = G_t - v_w(S_t) for all steps 
+    
+    # Policy Loss
+    action_logits = policy_net(states_tensor)  # Shape: [T, action_dim]
+    log_probs = torch.log_softmax(action_logits, dim=-1)  # Shape: [T, action_dim]
+    # Select log prob of chosen actions: log_probs[step_idx, action[step_idx]] for each step
+    chosen_log_probs = log_probs[torch.arange(len(actions_tensor), device=device), actions_tensor]
+    policy_loss = -torch.mean(chosen_log_probs * advantages)
+    
+    optimiser_policy.zero_grad()
+    policy_loss.backward()
+    optimiser_policy.step()
+    
+    # Value Loss: MSE between returns and value predictions
+    value_loss = F.mse_loss(values, returns_tensor)
+    optimiser_value.zero_grad()
+    value_loss.backward()
+    optimiser_value.step()
 
-        return policy_loss.item(), value_loss.item()
+    return policy_loss.item(), value_loss.item()
+
+    
+
 
 # test the sample_episode function
 def test_sample_episode():
@@ -153,8 +181,8 @@ def test_sample_episode():
     print("REINFORCE ALGORITHM TEST")
     print("="*60)
     
-    env = CacheEnv(num_pages=10, cache_size=3, episode_len=10)
-    policy_net = PolicyNetwork(state_dim=20, action_dim=10)
+    env = CacheEnv(num_pages=10, cache_size=3, episode_len=500)
+    policy_net = PolicyNetwork(state_dim=20, action_dim=3)  # action_dim = cache_size
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy_net.to(device)
     
@@ -163,12 +191,12 @@ def test_sample_episode():
     print(f"  - Cache size: {env.cache_size}")
     print(f"  - Episode length: {env.episode_len}")
     print(f"  - State dimension: 20 (2 * num_pages)")
-    print(f"  - Action dimension: 10 (num_pages)")
+    print(f"  - Action dimension: 3 (cache_size - cache slots 0 to {env.cache_size-1})")
     print(f"  - Device: {device}")
     print(f"  - Number of episodes: 100")
     
     # Run 100 episodes and collect statistics
-    num_episodes = 1
+    num_episodes = 100
     all_stats = []
     
     print(f"\n{'='*60}")
@@ -224,3 +252,6 @@ def test_sample_episode():
     print(f"  Hits: {worst_episode['num_hits']}, Misses: {worst_episode['num_misses']}")
     
     print(f"\n{'='*60}")
+
+if __name__ == "__main__":
+    test_sample_episode()
