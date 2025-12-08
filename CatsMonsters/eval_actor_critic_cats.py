@@ -50,7 +50,7 @@ def test_policy_and_value_networks():
     policy_net.to(device)
     value_net.to(device)
     env = CatMonstersEnv(seed=42)
-    
+    os.makedirs("eval_results/eval_actor_critic", exist_ok=True)
     eval_results = eval_cat_monsters_env(env, policy_net, device, num_episodes=100)
     
     print(f"\nActor-Critic Evaluation Results (over {len(eval_results['episode_rewards'])} episodes):")
@@ -103,7 +103,7 @@ def test_policy_and_value_networks():
     plt.tight_layout()
     
     # Save plot
-    plot_path = "eval_results_actor_critic.png"
+    plot_path = "eval_results/eval_actor_critic/eval_results_actor_critic.png"
     plt.savefig(plot_path, dpi=150)
     print(f"\nEvaluation plot saved to: {plot_path}")
     plt.close()

@@ -4,6 +4,7 @@ from models import PolicyNetwork, ValueNetwork
 from env_cat_monsters import CatMonstersEnv
 from reinforce import sample_episode
 import matplotlib.pyplot as plt
+import os
 
 def eval_cat_monsters_env(env: CatMonstersEnv, policy_net: PolicyNetwork, device: torch.device, num_episodes: int=1000) -> dict:
    
@@ -40,6 +41,7 @@ def test_policy_and_value_networks():
     policy_net.to(device)
     value_net.to(device)
     env = CatMonstersEnv(seed=42)
+    os.makedirs("eval_results/eval_reinforce", exist_ok=True)
     
     eval_results = eval_cat_monsters_env(env, policy_net, device, num_episodes=100)
     
@@ -96,7 +98,7 @@ def test_policy_and_value_networks():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("eval_results_reinforce.png", dpi=150)
+    plt.savefig("eval_results/eval_reinforce/eval_results_reinforce.png", dpi=150)
     plt.close()
     
     return eval_results
