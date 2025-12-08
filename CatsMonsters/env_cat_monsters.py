@@ -2,18 +2,7 @@ import numpy as np
 import random
 
 class CatMonstersEnv:
-    """
-    Cat and Monsters Environment - A 5x5 grid world where a cat tries to reach food
-    while avoiding monsters and forbidden furniture.
-    
-    States: (r, c) tuples representing positions in a 5x5 grid
-    Actions: 'AU' (Up), 'AD' (Down), 'AL' (Left), 'AR' (Right)
-    
-    Special cells:
-    - Food: (4, 4) - terminal state, reward +10
-    - Monsters: (0, 3), (4, 1) - reward -8
-    - Forbidden furniture: (2, 1), (2, 2), (2, 3), (3, 2) - cannot enter
-    """
+
     
     def __init__(self, discount_factor=0.925, seed=None):
         """

@@ -79,7 +79,7 @@ def train_actor_critic(
             # --------------------------
             # 2. Step environment
             # --------------------------
-            s2_np, r, done, info = env.step(a.item())
+            s2_np, r, done, _ = env.step(a.item())
             if normalize:
                 s2_np = normalize_state(s2_np, env)
             s2 = torch.tensor(s2_np, dtype=torch.float32, device=device)
