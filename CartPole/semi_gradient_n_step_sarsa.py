@@ -1,9 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
+from cartpole_env import CartPoleEnv
 
-
-def sample_episode_n_step(env, policy_fn, device, normalize_fn=None):
+def sample_episode_n_step(env: CartPoleEnv, policy_fn: torch.nn.Module, device: torch.device):
     """
     Sample an episode using a softmax policy over Q-values.
     Returns:
@@ -17,8 +17,6 @@ def sample_episode_n_step(env, policy_fn, device, normalize_fn=None):
     done = False
 
     while not done:
-        if normalize_fn:
-            state = normalize_fn(state, env)
 
         s = torch.tensor(state, dtype=torch.float32, device=device)
 
@@ -39,6 +37,7 @@ def sample_episode_n_step(env, policy_fn, device, normalize_fn=None):
 
 
 def compute_n_step_targets(states, actions, rewards, q_net, n, gamma, device):
+
     T = len(rewards)
     targets = torch.zeros(T, dtype=torch.float32, device=device)
 
@@ -109,7 +108,7 @@ def train_sarsa_n_step(env,
     for ep in range(num_episodes):
 
         states, actions, rewards = sample_episode_n_step(
-            env, policy_fn, device, normalize_fn
+            env, policy_fn, device
         )
 
         targets = compute_n_step_targets(

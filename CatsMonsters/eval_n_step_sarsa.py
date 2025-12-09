@@ -118,7 +118,7 @@ def test_q_network():
     # Plot 3: Reward histogram
     plt.subplot(2, 2, 3)
     plt.hist(eval_results["episode_rewards"], bins=20, alpha=0.7, color="blue", edgecolor="black")
-    plt.axvline(eval_results["avg_reward"], color="red", linestyle="--", label="Mean")
+    plt.axvline(eval_results["avg_reward"], color="red", linestyle="--", label=f"Mean: {eval_results['avg_reward']:.2f}")
     plt.xlabel("Reward")
     plt.ylabel("Frequency")
     plt.title("Reward Distribution (SARSA n-step)")
