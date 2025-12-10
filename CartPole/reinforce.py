@@ -1,16 +1,11 @@
-# Implementing the REINFORCE WITH BASELINE algorithm
-
 import torch 
 import numpy as np
 from torch.distributions import Categorical
 from models import PolicyNetwork, ValueNetwork
 from cartpole_env import CartPoleEnv
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import os
 
-
-def sample_episode(env, policy_net: PolicyNetwork, device: torch.device, gamma: float=0.99) -> tuple:
+def sample_episode(env: CartPoleEnv, policy_net: PolicyNetwork, device: torch.device, gamma: float=0.99) -> tuple:
     states, actions, rewards = [], [], []
     state = env.reset()
     done = False

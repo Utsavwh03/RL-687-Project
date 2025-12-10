@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import torch
 from torch.optim import Adam
-
+import matplotlib.pyplot as plt
 from cartpole_env import CartPoleEnv
 from models import QNetwork
 from semi_gradient_n_step_sarsa import (
@@ -11,7 +11,6 @@ from semi_gradient_n_step_sarsa import (
 
 
 def plot_curve(values, save_path, title):
-    import matplotlib.pyplot as plt
     plt.figure(figsize=(8,4))
     plt.plot(values, alpha=0.5, label="raw")
     if len(values) >= 50:
@@ -28,7 +27,6 @@ def plot_curve(values, save_path, title):
 
 
 def policy_from_q(q_net):
-    """Returns a function(state_tensor → q_logits)"""
     def _policy_fn(state):
         return q_net(state)
     return _policy_fn
@@ -64,7 +62,6 @@ def main():
     print(f"Device = {device}")
     print("="*60)
 
-    # Create a softmax policy based on Q network
     policy_fn = policy_from_q(q_net)
 
     logs = train_sarsa_n_step(
@@ -84,12 +81,10 @@ def main():
     os.makedirs("plots/sarsa_cartpole/", exist_ok=True)
     os.makedirs("checkpoints/sarsa_cartpole/", exist_ok=True)
 
-    # Save plots
     plot_curve(logs["rewards"], "plots/sarsa_cartpole/rewards.png", "Episode Rewards")
     plot_curve(logs["lengths"], "plots/sarsa_cartpole/lengths.png", "Episode Lengths")
     plot_curve(logs["loss"], "plots/sarsa_cartpole/loss.png", "TD Loss")
 
-    # Save weights
     torch.save(q_net.state_dict(), "checkpoints/sarsa_cartpole/q_net_cartpole_sarsa.pth")
 
     print("\nTraining finished. Model saved!")

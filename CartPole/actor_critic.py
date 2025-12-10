@@ -53,26 +53,16 @@ def train_actor_critic(
         ep_deltas = []
 
         while not done:
-            # --------------------------
-            # 1. ACTOR: sample action
-            # --------------------------
             logits = policy_net(s)
             dist = Categorical(logits=logits)
             a = dist.sample()
             log_prob = dist.log_prob(a)
 
-            # --------------------------
-            # 2. Step environment
-            # --------------------------
             s2_np, r, done, _ = env.step(a.item())
             if normalize:
                 s2_np = normalize_state(s2_np, env)
             s2 = torch.tensor(s2_np, dtype=torch.float32, device=device)
 
-            # --------------------------
-            # 3. TD(0) ADVANTAGE
-            # δ = r + γV(s') - V(s)
-            # --------------------------
             V_s = value_net(s)
             
             if V_s.dim() > 0:
@@ -89,18 +79,12 @@ def train_actor_critic(
             critic_loss.backward()
             opt_critic.step()
 
-            # --------------------------
-            # 5. Actor update: policy gradient with baseline
-            # --------------------------
             entropy = dist.entropy()
             actor_loss = -log_prob * delta.detach() - entropy_coef * entropy
             opt_actor.zero_grad()
             actor_loss.backward()
             opt_actor.step()
 
-            # --------------------------
-            # Logging
-            # --------------------------
             ep_reward += r
             ep_len += 1
             ep_actor_losses.append(actor_loss.item())
@@ -109,7 +93,6 @@ def train_actor_critic(
 
             s = s2
 
-        # Episode summary logs
         rewards_log.append(ep_reward)
         lengths_log.append(ep_len)
         actor_loss_log.append(float(np.mean(ep_actor_losses)))

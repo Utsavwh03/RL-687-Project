@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class CartPoleEnv:
 
     def __init__(self, max_episode_steps=500, seed=None):
@@ -22,19 +21,17 @@ class CartPoleEnv:
         self.step_count = 0
 
         self.np_random = np.random.RandomState(seed)
-
         self.state = None
 
+
     def reset(self):
-        """
-        Reset the environment by sampling a small random initial state.
-        """
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
         self.step_count = 0
         self.steps_beyond_done = None
         return self.state.astype(np.float32)
+    
+    
     def step(self, action):
-        
         assert action in [0, 1], "Action must be 0 (left) or 1 (right)."
         x, x_dot, theta, theta_dot = self.state
 
@@ -42,15 +39,11 @@ class CartPoleEnv:
         costheta = np.cos(theta)
         sintheta = np.sin(theta)
 
-        # ---- Physics equations from the original CartPole source ----
         temp = (force + self.polemass_length * theta_dot**2 * sintheta) / self.total_mass
-
         theta_acc = (self.gravity * sintheta - costheta * temp) / \
                     (self.length * (4.0/3.0 - self.masspole * costheta**2 / self.total_mass))
-
         x_acc = temp - self.polemass_length * theta_acc * costheta / self.total_mass
 
-        # ---- Euler integration ----
         x = x + self.tau * x_dot
         x_dot = x_dot + self.tau * x_acc
         theta = theta + self.tau * theta_dot
@@ -59,7 +52,6 @@ class CartPoleEnv:
         self.state = np.array([x, x_dot, theta, theta_dot])
         self.step_count += 1
 
-        # ---- Termination conditions ----
         terminated = (
             x < -self.x_threshold
             or x > self.x_threshold
@@ -70,7 +62,6 @@ class CartPoleEnv:
         truncated = self.step_count >= self.max_episode_steps
         done = terminated or truncated
 
-        # ---- Reward ----
         reward = 1.0 if not terminated else 0.0
 
         return self.state.astype(np.float32), reward, done, {}

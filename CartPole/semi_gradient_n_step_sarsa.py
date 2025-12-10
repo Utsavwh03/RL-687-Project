@@ -4,13 +4,7 @@ from torch.distributions import Categorical
 from cartpole_env import CartPoleEnv
 
 def sample_episode_n_step(env: CartPoleEnv, policy_fn: torch.nn.Module, device: torch.device):
-    """
-    Sample an episode using a softmax policy over Q-values.
-    Returns:
-        states: list of state tensors
-        actions: list of action indices (ints)
-        rewards: list of rewards
-    """
+
     states, actions, rewards = [], [], []
 
     state = env.reset()
@@ -20,7 +14,6 @@ def sample_episode_n_step(env: CartPoleEnv, policy_fn: torch.nn.Module, device: 
 
         s = torch.tensor(state, dtype=torch.float32, device=device)
 
-        # Policy uses Q-values as logits
         logits = policy_fn(s)
         dist = Categorical(logits=logits)
         action = dist.sample()
@@ -28,7 +21,7 @@ def sample_episode_n_step(env: CartPoleEnv, policy_fn: torch.nn.Module, device: 
         next_state, reward, done, _ = env.step(action.item())
 
         states.append(s)
-        actions.append(action.item())     # already int
+        actions.append(action.item()) 
         rewards.append(reward)
 
         state = next_state
@@ -45,7 +38,6 @@ def compute_n_step_targets(states, actions, rewards, q_net, n, gamma, device):
         G = 0.0
         power = 1.0
 
-        # accumulate first n rewards
         for k in range(n):
             if t + k < T:
                 G += power * rewards[t + k]
@@ -53,7 +45,6 @@ def compute_n_step_targets(states, actions, rewards, q_net, n, gamma, device):
             else:
                 break
 
-        # bootstrap if episode not finished
         if t + n < T:
             with torch.no_grad():
                 s_next = states[t + n]
@@ -67,16 +58,12 @@ def compute_n_step_targets(states, actions, rewards, q_net, n, gamma, device):
 
 
 def sarsa_n_step_update(q_net, optimizer, states, actions, targets, device):
-    """
-    Compute TD loss and update Q-network.
-    """
 
     states_tensor = torch.stack(states).to(device)
     actions_tensor = torch.tensor(actions, dtype=torch.long, device=device)
 
     q_vals = q_net(states_tensor)
 
-    # Extract Q(s_t, a_t)
     idx = torch.arange(len(actions_tensor), device=device)
     chosen_q = q_vals[idx, actions_tensor]
 

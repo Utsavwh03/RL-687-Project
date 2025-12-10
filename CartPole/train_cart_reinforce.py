@@ -3,15 +3,13 @@ import argparse
 import numpy as np
 import torch
 from torch.optim import Adam
-
 from cartpole_env import CartPoleEnv
 from models import PolicyNetwork, ValueNetwork
 from reinforce import sample_episode, reinforce_update
+import matplotlib.pyplot as plt
 
 
- 
 def plot_curve(values, save_path, title):
-    import matplotlib.pyplot as plt
     plt.figure(figsize=(8,4))
     plt.plot(values, alpha=0.5, label="raw")
     if len(values) >= 50:
@@ -46,7 +44,6 @@ def main():
     policy_net = PolicyNetwork(state_dim, action_dim)
     value_net = ValueNetwork(state_dim)
 
-    # Optimizers
     opt_actor = Adam(policy_net.parameters(), lr=args.actor_lr)
     opt_critic = Adam(value_net.parameters(), lr=args.critic_lr)
 
@@ -54,7 +51,6 @@ def main():
     policy_net.to(device)
     value_net.to(device)
 
-    # Training logs
     episode_rewards = []
     episode_lengths = []
     actor_losses = []
@@ -70,7 +66,6 @@ def main():
     print(f"Device: {device}")
     print("="*60)
 
-    # Train
     for ep in range(args.num_episodes):
         states, actions, rewards, stats = sample_episode(env, policy_net, device, args.gamma)
         
@@ -88,7 +83,6 @@ def main():
         critic_losses.append(critic_loss)
         entropies.append(entropy)
         
-        # Print progress
         if (ep + 1) % 100 == 0 or ep == args.num_episodes - 1:
             avg_reward = np.mean(episode_rewards[-100:]) if len(episode_rewards) >= 100 else np.mean(episode_rewards)
             avg_length = np.mean(episode_lengths[-100:]) if len(episode_lengths) >= 100 else np.mean(episode_lengths)
@@ -99,34 +93,28 @@ def main():
                 f"A_Loss={actor_loss:.4f}  C_Loss={critic_loss:.4f}  Entropy={entropy:.4f}"
             )
 
-    # Create logs dictionary (same format as Actor-Critic for consistency)
     logs = {
         "rewards": episode_rewards,
         "lengths": episode_lengths,
         "actor_loss": actor_losses,
         "critic_loss": critic_losses,
-        "td_error": [0.0] * args.num_episodes  # REINFORCE doesn't use TD error
+        "td_error": [0.0] * args.num_episodes 
     }
 
-    # Save directories
     os.makedirs("plots/reinforce_cartpole/", exist_ok=True)
     os.makedirs("checkpoints/reinforce_cartpole/", exist_ok=True)
 
-    # Save individual plots
     plot_curve(logs["rewards"], "plots/reinforce_cartpole/rewards.png", "Episode Rewards")
     plot_curve(logs["lengths"], "plots/reinforce_cartpole/lengths.png", "Episode Lengths")
     plot_curve(logs["actor_loss"], "plots/reinforce_cartpole/actor_loss.png", "Actor Loss")
     plot_curve(logs["critic_loss"], "plots/reinforce_cartpole/critic_loss.png", "Critic Loss")
     plot_curve(entropies, "plots/reinforce_cartpole/entropy.png", "Policy Entropy")
     
-    # Create combined grid plot
-    import matplotlib.pyplot as plt
     episodes = np.arange(1, args.num_episodes + 1)
     window = 100
     
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
     
-    # Top left: Episode Rewards
     axes[0, 0].plot(episodes, episode_rewards, alpha=0.2, color='blue')
     if len(episode_rewards) >= window:
         moving_avg_reward = np.convolve(episode_rewards, np.ones(window) / window, mode='valid')
@@ -136,7 +124,6 @@ def main():
     axes[0, 0].set_title('Episode Reward')
     axes[0, 0].grid(True, alpha=0.3)
     
-    # Top right: Episode Lengths
     axes[0, 1].plot(episodes, episode_lengths, alpha=0.2, color='green')
     if len(episode_lengths) >= window:
         moving_avg_lengths = np.convolve(episode_lengths, np.ones(window) / window, mode='valid')
@@ -146,7 +133,6 @@ def main():
     axes[0, 1].set_title('Episode Lengths')
     axes[0, 1].grid(True, alpha=0.3)
     
-    # Bottom left: Training Losses
     axes[1, 0].plot(episodes, actor_losses, alpha=0.2, color='purple', label='Actor')
     axes[1, 0].plot(episodes, critic_losses, alpha=0.2, color='brown', label='Critic')
     if len(actor_losses) >= window:
@@ -160,7 +146,6 @@ def main():
     axes[1, 0].legend()
     axes[1, 0].grid(True, alpha=0.3)
     
-    # Bottom right: Policy Entropy
     axes[1, 1].plot(episodes, entropies, alpha=0.2, color='teal')
     if len(entropies) >= window:
         moving_avg_entropy = np.convolve(entropies, np.ones(window) / window, mode='valid')
@@ -174,7 +159,6 @@ def main():
     fig.savefig("plots/reinforce_cartpole/all_metrics.png", dpi=150)
     plt.close(fig)
 
-    # Save weights
     torch.save(policy_net.state_dict(), "checkpoints/reinforce_cartpole/policy_net_cartpole_reinforce.pth")
     torch.save(value_net.state_dict(), "checkpoints/reinforce_cartpole/value_net_cartpole_reinforce.pth")
 

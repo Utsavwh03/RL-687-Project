@@ -5,7 +5,6 @@ from cartpole_env import CartPoleEnv
 import matplotlib.pyplot as plt
 import os
 
-
 def eval_cartpole_env_sarsa(env: CartPoleEnv, q_net: QNetwork, device: torch.device, num_episodes: int = 1000) -> dict:
     episode_rewards = []
     episode_steps = []

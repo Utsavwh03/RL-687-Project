@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from models import PolicyNetwork, ValueNetwork
 from cartpole_env import CartPoleEnv
-from reinforce import sample_episode
 import matplotlib.pyplot as plt
 import os
 
@@ -49,7 +48,6 @@ def eval_cartpole_env(env: CartPoleEnv, policy_net: PolicyNetwork, device: torch
 
 
 def load_policy_and_value_networks():
-    """Load trained REINFORCE policy and value networks for CartPole."""
     policy_net = PolicyNetwork(state_dim=4, action_dim=2, hidden_dim=128)
     value_net = ValueNetwork(state_dim=4, hidden_dim=128)
     
@@ -69,7 +67,6 @@ def load_policy_and_value_networks():
 
 
 def test_policy_and_value_networks():
-    """Test loaded REINFORCE policy and value networks on CartPoleEnv."""
     policy_net, value_net = load_policy_and_value_networks()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     policy_net.to(device)
@@ -78,7 +75,6 @@ def test_policy_and_value_networks():
     
     eval_results = eval_cartpole_env(env, policy_net, device, num_episodes=100)
     
-    # Print summary statistics
     print(f"\nREINFORCE Evaluation Results for CartPole (over {len(eval_results['episode_rewards'])} episodes):")
     print(f"  Average Reward: {eval_results['avg_reward']:.4f} ± {eval_results['std_reward']:.4f}")
     print(f"  Average Steps: {eval_results['avg_steps']:.4f} ± {eval_results['std_steps']:.4f}")
@@ -87,13 +83,9 @@ def test_policy_and_value_networks():
     print(f"  Min Steps: {np.min(eval_results['episode_steps']):.0f}")
     print(f"  Max Steps: {np.max(eval_results['episode_steps']):.0f}")
     
-    # Create output directory if it doesn't exist
     os.makedirs("results/eval", exist_ok=True)
-    
-    # Save and plot all types of results in 2x2 subplots
     plt.figure(figsize=(12, 12))
     
-    # Plot 1: Episode Rewards over episodes
     plt.subplot(2, 2, 1)
     plt.plot(eval_results['episode_rewards'], alpha=0.6, color='blue')
     plt.axhline(y=eval_results['avg_reward'], color='red', linestyle='--', linewidth=2, label=f'Mean: {eval_results["avg_reward"]:.2f}')
@@ -103,7 +95,6 @@ def test_policy_and_value_networks():
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    # Plot 2: Episode Steps over episodes
     plt.subplot(2, 2, 2)
     plt.plot(eval_results['episode_steps'], alpha=0.6, color='green')
     plt.axhline(y=eval_results['avg_steps'], color='orange', linestyle='--', linewidth=2, label=f'Mean: {eval_results["avg_steps"]:.2f}')
@@ -113,7 +104,6 @@ def test_policy_and_value_networks():
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    # Plot 3: Reward Distribution (Histogram)
     plt.subplot(2, 2, 3)
     plt.hist(eval_results['episode_rewards'], bins=20, alpha=0.7, color='blue', edgecolor='black')
     plt.axvline(x=eval_results['avg_reward'], color='red', linestyle='--', linewidth=2, label=f'Mean: {eval_results["avg_reward"]:.2f}')
@@ -123,7 +113,6 @@ def test_policy_and_value_networks():
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    # Plot 4: Steps Distribution (Histogram)
     plt.subplot(2, 2, 4)
     plt.hist(eval_results['episode_steps'], bins=20, alpha=0.7, color='green', edgecolor='black')
     plt.axvline(x=eval_results['avg_steps'], color='orange', linestyle='--', linewidth=2, label=f'Mean: {eval_results["avg_steps"]:.2f}')
@@ -135,7 +124,6 @@ def test_policy_and_value_networks():
     
     plt.tight_layout()
     
-    # Save plot
     plot_path = "eval_results_reinforce_cartpole.png"
     plt.savefig(plot_path, dpi=150)
     print(f"\nEvaluation plot saved to: {plot_path}")
